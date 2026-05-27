@@ -168,6 +168,7 @@ const mediaSchema = new mongoose.Schema({
   url: String,
   embedCode: String,
   thumbnail: String,
+  gallery: [String],
   tags: [String],
   category: String,
   publishDate: { type: Date, default: Date.now },

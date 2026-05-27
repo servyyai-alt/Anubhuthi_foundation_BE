@@ -1,8 +1,22 @@
 const express = require('express');
 const mediaRouter = express.Router();
 const analyticsRouter = express.Router();
+const multer = require('multer');
 const { Media, Donation, Contact, Volunteer, Program, Event } = require('../models/index');
 const { protect, adminOnly } = require('../middleware/auth');
+const { uploadImageBuffer } = require('../utils/cloudinary');
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype?.startsWith('image/')) {
+      return cb(null, true);
+    }
+
+    return cb(new Error('Only image files are allowed.'));
+  }
+});
 
 // Media routes
 mediaRouter.get('/', async (req, res) => {
@@ -15,6 +29,35 @@ mediaRouter.get('/', async (req, res) => {
     res.json({ success: true, data: media });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+mediaRouter.post('/upload-image', protect, adminOnly, upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'Please select an image to upload.' });
+    }
+
+    const result = await uploadImageBuffer(req.file.buffer, req.file.originalname, req.file.mimetype);
+    return res.status(201).json({ success: true, data: result });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+mediaRouter.post('/upload-images', protect, adminOnly, upload.array('images', 10), async (req, res) => {
+  try {
+    if (!req.files?.length) {
+      return res.status(400).json({ success: false, message: 'Please select at least one image to upload.' });
+    }
+
+    const uploads = await Promise.all(
+      req.files.map((file) => uploadImageBuffer(file.buffer, file.originalname, file.mimetype))
+    );
+
+    return res.status(201).json({ success: true, data: uploads });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
   }
 });
 

@@ -1,7 +1,21 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const Program = require('../models/Program');
 const { protect, adminOnly } = require('../middleware/auth');
+const { uploadImageBuffer } = require('../utils/cloudinary');
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype?.startsWith('image/')) {
+      return cb(null, true);
+    }
+
+    return cb(new Error('Only image files are allowed.'));
+  }
+});
 
 // GET /api/programs - Public
 router.get('/', async (req, res) => {
@@ -19,6 +33,20 @@ router.get('/', async (req, res) => {
     res.json({ success: true, data: programs, total, page: parseInt(page), pages: Math.ceil(total / limit) });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/programs/upload-image - Admin only
+router.post('/upload-image', protect, adminOnly, upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'Please select an image to upload.' });
+    }
+
+    const result = await uploadImageBuffer(req.file.buffer, req.file.originalname, req.file.mimetype);
+    return res.status(201).json({ success: true, data: result });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
   }
 });
 
@@ -46,7 +74,11 @@ router.post('/', protect, adminOnly, async (req, res) => {
 // PUT /api/programs/:id - Admin only
 router.put('/:id', protect, adminOnly, async (req, res) => {
   try {
-    const program = await Program.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    const program = await Program.findByIdAndUpdate(
+      req.params.id,
+      { ...req.body, updatedAt: Date.now() },
+      { new: true, runValidators: true }
+    );
     if (!program) return res.status(404).json({ success: false, message: 'Program not found' });
     res.json({ success: true, data: program });
   } catch (err) {
