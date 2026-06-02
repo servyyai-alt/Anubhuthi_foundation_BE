@@ -36,6 +36,16 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/programs/admin/all - Admin only
+router.get('/admin/all', protect, adminOnly, async (req, res) => {
+  try {
+    const programs = await Program.find().sort({ isFeatured: -1, createdAt: -1 });
+    res.json({ success: true, data: programs, total: programs.length });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // POST /api/programs/upload-image - Admin only
 router.post('/upload-image', protect, adminOnly, upload.single('image'), async (req, res) => {
   try {

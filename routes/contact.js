@@ -24,7 +24,7 @@ router.post('/', async (req, res) => {
     // Send confirmation to user
     await sendEmail(req.body.email, 'We received your message - Anubhuthi Foundation', `
       <div style="font-family: Georgia, serif; max-width: 600px; margin: 0 auto; padding: 40px; background: #fafaf8;">
-        <h1 style="color: #8B5E3C; font-size: 28px;">Namaste, ${req.body.name} 🙏</h1>
+        <h1 style="color: #8B5E3C; font-size: 28px;">Namaste, ${req.body.name} </h1>
         <p style="color: #555; font-size: 16px; line-height: 1.8;">
           Thank you for reaching out to the Anubhuthi Foundation. We have received your message and our team will get back to you within 2-3 business days.
         </p>

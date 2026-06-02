@@ -24,6 +24,15 @@ router.post('/', async (req, res) => {
   }
 });
 
+router.post('/admin', protect, adminOnly, async (req, res) => {
+  try {
+    const testimonial = await Testimonial.create(req.body);
+    res.status(201).json({ success: true, data: testimonial });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 router.get('/admin/all', protect, adminOnly, async (req, res) => {
   try {
     const testimonials = await Testimonial.find().sort({ createdAt: -1 });

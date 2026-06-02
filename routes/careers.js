@@ -12,6 +12,15 @@ router.get('/', async (req, res) => {
   }
 });
 
+router.get('/admin/all', protect, adminOnly, async (req, res) => {
+  try {
+    const careers = await Career.find().sort({ createdAt: -1 });
+    res.json({ success: true, data: careers, total: careers.length });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 router.get('/:id', async (req, res) => {
   try {
     const career = await Career.findById(req.params.id);
