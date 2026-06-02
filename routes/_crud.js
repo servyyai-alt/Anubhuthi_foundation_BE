@@ -24,6 +24,16 @@ const crudRoutes = (Model, publicFilter = { isActive: true }) => {
     }
   });
 
+  r.get('/admin/all', protect, adminOnly, async (req, res) => {
+    try {
+      const data = await Model.find()
+        .sort({ isFeatured: -1, createdAt: -1 });
+      res.json({ success: true, data, total: data.length });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  });
+
   r.get('/:id', async (req, res) => {
     try {
       const doc = await Model.findById(req.params.id);

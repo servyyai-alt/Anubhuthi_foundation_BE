@@ -32,6 +32,15 @@ mediaRouter.get('/', async (req, res) => {
   }
 });
 
+mediaRouter.get('/admin/all', protect, adminOnly, async (req, res) => {
+  try {
+    const media = await Media.find().sort({ isFeatured: -1, publishDate: -1, createdAt: -1 });
+    res.json({ success: true, data: media, total: media.length });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 mediaRouter.post('/upload-image', protect, adminOnly, upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {

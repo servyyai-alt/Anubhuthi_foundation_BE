@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const Program = require('./Program');
 
 // Event Model
 const eventSchema = new mongoose.Schema({
@@ -178,6 +179,7 @@ const mediaSchema = new mongoose.Schema({
 });
 
 module.exports = {
+  Program,
   Event: mongoose.model('Event', eventSchema),
   Retreat: mongoose.model('Retreat', retreatSchema),
   Career: mongoose.model('Career', careerSchema),
