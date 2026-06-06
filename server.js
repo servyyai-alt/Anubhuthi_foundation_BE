@@ -1,9 +1,9 @@
 const express = require('express');
-const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+const { ensureDatabaseConnected } = require('./utils/database');
 require('dotenv').config();
 
 const app = express();
@@ -33,6 +33,24 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Static files
 app.use('/uploads', express.static('uploads'));
 
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', message: 'Anubhuthi Foundation API is running' });
+});
+
+// Ensure serverless cold starts wait for MongoDB before DB-backed routes run.
+app.use('/api', async (req, res, next) => {
+  try {
+    await ensureDatabaseConnected();
+    next();
+  } catch (err) {
+    res.status(err.status || 503).json({
+      success: false,
+      message: err.status ? err.message : 'Database connection failed.'
+    });
+  }
+});
+
 // Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/programs', require('./routes/programs'));
@@ -45,11 +63,6 @@ app.use('/api/donations', require('./routes/donations'));
 app.use('/api/volunteers', require('./routes/volunteers'));
 app.use('/api/media', require('./routes/media'));
 app.use('/api/analytics', require('./routes/analytics'));
-
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Anubhuthi Foundation API is running' });
-});
 
 // Error handler
 app.use((err, req, res, next) => {
@@ -65,33 +78,18 @@ app.use('*', (req, res) => {
   res.status(404).json({ success: false, message: 'Route not found' });
 });
 
-// DB connection
-const connectDB = async () => {
-  try {
-    const mongoUri = process.env.MONGODB_URI || (!process.env.VERCEL ? 'mongodb://localhost:27017/anubhuthi' : null);
-
-    if (!mongoUri) {
-      console.warn('MONGODB_URI is not configured; database routes will be unavailable.');
-      return;
-    }
-
-    await mongoose.connect(mongoUri);
-    console.log('✅ MongoDB Connected');
-  } catch (err) {
-    console.error('❌ MongoDB connection error:', err.message);
-    if (!process.env.VERCEL) {
-      process.exit(1);
-    }
-  }
-};
-
-connectDB();
-
 const PORT = process.env.PORT || 5000;
 if (!process.env.VERCEL) {
-  app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-  });
+  ensureDatabaseConnected()
+    .then(() => {
+      app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+      });
+    })
+    .catch((err) => {
+      console.error('MongoDB connection error:', err.message);
+      process.exit(1);
+    });
 }
 
 module.exports = app;

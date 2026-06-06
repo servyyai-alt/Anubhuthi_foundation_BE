@@ -21,11 +21,15 @@ const upload = multer({
 // Media routes
 mediaRouter.get('/', async (req, res) => {
   try {
-    const { type, featured } = req.query;
+    const { type, featured, limit } = req.query;
     const query = { isActive: true };
     if (type) query.type = type;
     if (featured) query.isFeatured = true;
-    const media = await Media.find(query).sort({ isFeatured: -1, publishDate: -1 });
+    const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 0, 0), 50);
+    const mediaQuery = Media.find(query).sort({ isFeatured: -1, publishDate: -1 });
+    if (parsedLimit) mediaQuery.limit(parsedLimit);
+
+    const media = await mediaQuery;
     res.json({ success: true, data: media });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
