@@ -17,7 +17,7 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const testimonial = await Testimonial.create({ ...req.body, isApproved: false });
+    const testimonial = await Testimonial.create({ ...req.body, isUserSubmitted: true, isApproved: false });
     res.status(201).json({ success: true, message: 'Testimonial submitted for review', data: testimonial });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -26,7 +26,7 @@ router.post('/', async (req, res) => {
 
 router.post('/admin', protect, adminOnly, async (req, res) => {
   try {
-    const testimonial = await Testimonial.create(req.body);
+    const testimonial = await Testimonial.create({ isApproved: true, ...req.body, isUserSubmitted: false });
     res.status(201).json({ success: true, data: testimonial });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

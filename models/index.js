@@ -84,6 +84,7 @@ const testimonialSchema = new mongoose.Schema({
   program: String,
   isApproved: { type: Boolean, default: false },
   isFeatured: { type: Boolean, default: false },
+  isUserSubmitted: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now }
 });
 
@@ -112,6 +113,9 @@ const donationSchema = new mongoose.Schema({
     enum: ['general', 'temple-restoration', 'retreat-scholarship', 'programs', 'community', 'himalayan-mission'],
     default: 'general'
   },
+  country: String,
+  offeringType: String,
+  donationCategory: String,
   message: String,
   paymentId: String,
   orderId: String,
@@ -130,6 +134,8 @@ const volunteerSchema = new mongoose.Schema({
   email: { type: String, required: true },
   phone: String,
   age: Number,
+  dob: { type: Date },
+  gender: { type: String },
   city: String,
   country: String,
   education: String,

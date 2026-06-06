@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { Career, Application } = require('../models/index');
 const { protect, adminOnly } = require('../middleware/auth');
+const { upload, getFileUrl } = require('../utils/fileUpload');
 
 router.get('/', async (req, res) => {
   try {
@@ -16,6 +17,18 @@ router.get('/admin/all', protect, adminOnly, async (req, res) => {
   try {
     const careers = await Career.find().sort({ createdAt: -1 });
     res.json({ success: true, data: careers, total: careers.length });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Get all applications for all jobs
+router.get('/admin/applications/all', protect, adminOnly, async (req, res) => {
+  try {
+    const applications = await Application.find()
+      .populate('career')
+      .sort({ createdAt: -1 });
+    res.json({ success: true, data: applications, total: applications.length });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -59,9 +72,43 @@ router.delete('/:id', protect, adminOnly, async (req, res) => {
 });
 
 // Career Applications
-router.post('/:id/apply', async (req, res) => {
+router.post('/:id/apply', (req, res, next) => {
+  upload.fields([
+    { name: 'resume', maxCount: 1 },
+    { name: 'coverLetter', maxCount: 1 }
+  ])(req, res, function (err) {
+    if (err) {
+      return res.status(400).json({ success: false, message: err.message });
+    }
+    next();
+  });
+}, async (req, res) => {
   try {
-    const application = await Application.create({ career: req.params.id, ...req.body });
+    const mongoose = require('mongoose');
+    const appData = {
+      career: mongoose.Types.ObjectId.isValid(req.params.id) ? req.params.id : undefined,
+      name: req.body.name,
+      email: req.body.email,
+      phone: req.body.phone,
+      linkedIn: req.body.linkedIn,
+      portfolio: req.body.portfolio,
+      experience: req.body.experience,
+      notes: req.body.notes
+    };
+    
+    if (req.files && req.files.resume && req.files.resume[0]) {
+      appData.resumeUrl = getFileUrl(req, req.files.resume[0].filename);
+    } else if (req.body.resumeUrl) {
+      appData.resumeUrl = req.body.resumeUrl;
+    }
+    
+    if (req.files && req.files.coverLetter && req.files.coverLetter[0]) {
+      appData.coverLetter = getFileUrl(req, req.files.coverLetter[0].filename);
+    } else if (req.body.coverLetter) {
+      appData.coverLetter = req.body.coverLetter;
+    }
+    
+    const application = await Application.create(appData);
     res.status(201).json({ success: true, data: application, message: 'Application submitted successfully' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

@@ -37,10 +37,11 @@ router.post('/create-order', async (req, res) => {
 // Verify and save donation
 router.post('/verify', async (req, res) => {
   try {
-    const { donorName, email, phone, amount, purpose, message, paymentId, orderId, isAnonymous, panNumber } = req.body;
+    const { donorName, email, phone, amount, purpose, message, paymentId, orderId, isAnonymous, panNumber, country, offeringType, donationCategory } = req.body;
     const donation = await Donation.create({
       donorName, email, phone, amount, purpose, message,
       paymentId, orderId, isAnonymous, panNumber,
+      country, offeringType, donationCategory,
       status: 'completed'
     });
     res.status(201).json({ success: true, data: donation, message: 'Donation recorded. Thank you for your generous support!' });
