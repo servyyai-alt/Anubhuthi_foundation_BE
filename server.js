@@ -68,7 +68,14 @@ app.use('*', (req, res) => {
 // DB connection
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/anubhuthi');
+    const mongoUri = process.env.MONGODB_URI || (!process.env.VERCEL ? 'mongodb://localhost:27017/anubhuthi' : null);
+
+    if (!mongoUri) {
+      console.warn('MONGODB_URI is not configured; database routes will be unavailable.');
+      return;
+    }
+
+    await mongoose.connect(mongoUri);
     console.log('✅ MongoDB Connected');
   } catch (err) {
     console.error('❌ MongoDB connection error:', err.message);
