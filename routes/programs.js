@@ -7,13 +7,13 @@ const { uploadImageBuffer } = require('../utils/cloudinary');
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 100 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    if (file.mimetype?.startsWith('image/')) {
+    if (file.mimetype?.startsWith('image/') || file.mimetype?.startsWith('video/') || file.mimetype?.startsWith('audio/') || file.mimetype === 'application/pdf') {
       return cb(null, true);
     }
 
-    return cb(new Error('Only image files are allowed.'));
+    return cb(new Error('Only image, video, audio, or PDF files are allowed.'));
   }
 });
 
