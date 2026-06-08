@@ -24,11 +24,11 @@ const storage = multer.diskStorage({
 
 // File filter
 const fileFilter = (req, file, cb) => {
-  if (file.fieldname === 'coverLetter' || file.fieldname === 'resume') {
-    if (file.mimetype === 'application/pdf' || path.extname(file.originalname).toLowerCase() === '.pdf') {
+  if (file.fieldname === 'coverLetter' || file.fieldname === 'resume' || file.fieldname === 'document') {
+    if (file.mimetype === 'application/pdf' || path.extname(file.originalname).toLowerCase() === '.pdf' || file.mimetype === 'application/msword' || file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || path.extname(file.originalname).toLowerCase() === '.doc' || path.extname(file.originalname).toLowerCase() === '.docx') {
       cb(null, true);
     } else {
-      cb(new Error('Only PDF files are allowed for resume and cover letter!'), false);
+      cb(new Error('Only PDF and DOC files are allowed for documents!'), false);
     }
   } else {
     cb(null, true);

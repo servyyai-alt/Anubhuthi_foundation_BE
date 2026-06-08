@@ -5,18 +5,141 @@ const multer = require('multer');
 const { Media, Donation, Contact, Volunteer, Program, Event } = require('../models/index');
 const { protect, adminOnly } = require('../middleware/auth');
 const { uploadImageBuffer } = require('../utils/cloudinary');
+const { upload: localUpload, getFileUrl } = require('../utils/fileUpload');
+
+const OFFICE_MIME_TYPES = new Set([
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+]);
 
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 100 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    if (file.mimetype?.startsWith('image/') || file.mimetype?.startsWith('video/') || file.mimetype?.startsWith('audio/') || file.mimetype === 'application/pdf') {
+    if (
+      file.mimetype?.startsWith('image/')
+      || file.mimetype?.startsWith('video/')
+      || file.mimetype?.startsWith('audio/')
+      || OFFICE_MIME_TYPES.has(file.mimetype)
+    ) {
       return cb(null, true);
     }
 
-    return cb(new Error('Only image, video, audio, or PDF files are allowed.'));
+    return cb(new Error('Only image, video, audio, PDF, DOC, or DOCX files are allowed.'));
   }
 });
+
+function getFileExtension(value = '') {
+  const clean = String(value).split('?')[0].split('#')[0];
+  const match = clean.match(/\.([a-z0-9]+)$/i);
+  return match ? match[1].toLowerCase() : '';
+}
+
+function getYouTubeThumbnail(url = '') {
+  const value = String(url);
+  const match = value.match(/(?:youtube\.com\/(?:embed\/|watch\?v=)|youtu\.be\/)([\w-]{6,})/i);
+  return match ? `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg` : '';
+}
+
+function buildCloudinaryPreview(url = '', transforms = '') {
+  if (!url.includes('/upload/')) return '';
+
+  const [base, query = ''] = url.split('?');
+  const transformed = base.replace('/upload/', `/upload/${transforms}/`);
+  return query ? `${transformed}?${query}` : transformed;
+}
+
+function getDocumentMetadata(item) {
+  const fileUrl = item.url || '';
+  const fileName = item.fileName || decodeURIComponent(fileUrl.split('/').pop()?.split('?')[0] || '') || item.title;
+  const extension = getFileExtension(item.fileName || fileUrl || item.mimeType);
+  const mimeType = item.mimeType || '';
+  const isPdf = extension === 'pdf' || mimeType === 'application/pdf';
+  const isWord = ['doc', 'docx'].includes(extension)
+    || mimeType === 'application/msword'
+    || mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+  return { fileName, extension, mimeType, isPdf, isWord };
+}
+
+function derivePreview(item) {
+  const gallery = Array.isArray(item.gallery) ? item.gallery.filter(Boolean) : [];
+  const description = item.excerpt || item.description || '';
+  const base = {
+    cardPreviewUrl: '',
+    cardPreviewKind: item.type,
+    cardPlaceholder: item.type,
+    cardBadge: '',
+    excerpt: description.length > 180 ? `${description.slice(0, 177)}...` : description,
+    duration: item.duration || '',
+    galleryCount: gallery.length,
+    fileExtension: '',
+    fileName: item.fileName || '',
+    mimeType: item.mimeType || ''
+  };
+
+  if (item.type === 'video') {
+    return {
+      ...base,
+      cardPreviewKind: 'image',
+      cardPreviewUrl: item.previewImage || item.thumbnail || getYouTubeThumbnail(item.url) || buildCloudinaryPreview(item.url, 'so_0,f_jpg,q_auto,w_960,c_fill'),
+      cardBadge: 'Watch'
+    };
+  }
+
+  if (item.type === 'podcast') {
+    return {
+      ...base,
+      cardPreviewKind: item.previewImage || item.thumbnail || gallery[0] ? 'image' : 'podcast',
+      cardPreviewUrl: item.previewImage || item.thumbnail || gallery[0] || '',
+      cardBadge: item.duration ? `${item.duration}` : 'Audio'
+    };
+  }
+
+  if (item.type === 'article') {
+    return {
+      ...base,
+      cardPreviewKind: item.previewImage || item.thumbnail || gallery[0] ? 'image' : 'article',
+      cardPreviewUrl: item.previewImage || item.thumbnail || gallery[0] || '',
+      cardBadge: item.category || 'Article'
+    };
+  }
+
+  if (item.type === 'gallery') {
+    return {
+      ...base,
+      cardPreviewKind: gallery[0] || item.thumbnail ? 'image' : 'gallery',
+      cardPreviewUrl: gallery[0] || item.thumbnail || '',
+      cardBadge: `${gallery.length || 0} Image${gallery.length === 1 ? '' : 's'}`
+    };
+  }
+
+  if (item.type === 'document') {
+    const documentMeta = getDocumentMetadata(item);
+    return {
+      ...base,
+      cardPreviewKind: documentMeta.isPdf ? 'pdf' : 'document',
+      cardPreviewUrl: item.previewImage
+        || item.thumbnail
+        || (documentMeta.isPdf ? buildCloudinaryPreview(item.url, 'pg_1,f_jpg,q_auto,w_960,c_fill') : ''),
+      cardBadge: documentMeta.extension ? documentMeta.extension.toUpperCase() : 'Document',
+      fileExtension: documentMeta.extension,
+      fileName: documentMeta.fileName,
+      mimeType: documentMeta.mimeType
+    };
+  }
+
+  return base;
+}
+
+function serializeMediaItem(doc) {
+  const item = typeof doc.toObject === 'function' ? doc.toObject() : doc;
+  return {
+    ...item,
+    ...derivePreview(item)
+  };
+}
 
 // Media routes
 mediaRouter.get('/', async (req, res) => {
@@ -30,7 +153,7 @@ mediaRouter.get('/', async (req, res) => {
     if (parsedLimit) mediaQuery.limit(parsedLimit);
 
     const media = await mediaQuery;
-    res.json({ success: true, data: media });
+    res.json({ success: true, data: media.map(serializeMediaItem) });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -39,7 +162,7 @@ mediaRouter.get('/', async (req, res) => {
 mediaRouter.get('/admin/all', protect, adminOnly, async (req, res) => {
   try {
     const media = await Media.find().sort({ isFeatured: -1, publishDate: -1, createdAt: -1 });
-    res.json({ success: true, data: media, total: media.length });
+    res.json({ success: true, data: media.map(serializeMediaItem), total: media.length });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -48,7 +171,7 @@ mediaRouter.get('/admin/all', protect, adminOnly, async (req, res) => {
 mediaRouter.post('/upload-image', protect, adminOnly, upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ success: false, message: 'Please select an image to upload.' });
+      return res.status(400).json({ success: false, message: 'Please select a file to upload.' });
     }
 
     const result = await uploadImageBuffer(req.file.buffer, req.file.originalname, req.file.mimetype);
@@ -69,6 +192,27 @@ mediaRouter.post('/upload-images', protect, adminOnly, upload.array('images', 10
     );
 
     return res.status(201).json({ success: true, data: uploads });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+mediaRouter.post('/upload-document', protect, adminOnly, localUpload.single('document'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'Please select a document file to upload.' });
+    }
+
+    const fileUrl = getFileUrl(req, req.file.filename);
+    
+    return res.status(201).json({ 
+      success: true, 
+      data: { 
+        url: fileUrl, 
+        fileName: req.file.originalname,
+        mimeType: req.file.mimetype 
+      } 
+    });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
